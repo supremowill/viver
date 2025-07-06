@@ -6,9 +6,14 @@ const SurvivalGame: React.FC = () => {
   const { user } = useAuth()
   const navigate = useNavigate()
   const gameContainerRef = useRef<HTMLDivElement>(null)
+  const styleRef = useRef<HTMLStyleElement | null>(null)
+  const scriptRef = useRef<HTMLScriptElement | null>(null)
   const [isGameLoaded, setIsGameLoaded] = useState(false)
   const [playerName, setPlayerName] = useState('')
   const [gameStarted, setGameStarted] = useState(false)
+  const [platform, setPlatform] = useState<'pc' | 'mobile' | null>(null)
+  const [leaderboardStart, setLeaderboardStart] = useState<string>('Carregando ranking...')
+  const [leaderboardGameOver, setLeaderboardGameOver] = useState<string>('Atualizando ranking...')
 
   useEffect(() => {
     if (!user) {
@@ -18,6 +23,25 @@ const SurvivalGame: React.FC = () => {
 
     // Carregar Three.js e inicializar o jogo
     loadThreeJS()
+
+    // Cleanup function
+    return () => {
+      // Remove dynamically created style element
+      if (styleRef.current && styleRef.current.parentNode) {
+        styleRef.current.parentNode.removeChild(styleRef.current)
+      }
+      // Remove dynamically created script element
+      if (scriptRef.current && scriptRef.current.parentNode) {
+        scriptRef.current.parentNode.removeChild(scriptRef.current)
+      }
+      // Clean up global variables
+      if ((window as any).rankingManager) {
+        delete (window as any).rankingManager
+      }
+      if ((window as any).THREE) {
+        delete (window as any).THREE
+      }
+    }
   }, [user, navigate])
 
   const loadThreeJS = async () => {
@@ -37,175 +61,29 @@ const SurvivalGame: React.FC = () => {
   }
 
   const initializeGame = () => {
-    if (!gameContainerRef.current) return
-
-    // Criar o HTML do jogo dinamicamente
-    const gameHTML = `
-      <div id="blind-overlay" class="blind-screen-effect"></div>
-
-      <div id="start-screen" class="overlay-screen">
-        <h1>SOBREVIVÊNCIA 3D</h1>
-        <p>Digite seu nome para entrar no ranking!</p>
-        <input type="text" id="player-name-input" placeholder="Seu nome aqui..." maxlength="15" value="${user?.email?.split('@')[0] || ''}">
-        <p>Escolha sua plataforma para começar</p>
-        <div> 
-          <button id="pc-button" class="overlay-button">PC</button>
-          <button id="mobile-button" class="overlay-button">Mobile</button>
-        </div>
-        <div id="leaderboard-start" class="leaderboard-container">
-          <h2>🏆 Ranking - Top 10 🏆</h2>
-          <ol id="leaderboard-list-start">
-            <li>Carregando ranking...</li>
-          </ol>
-        </div>
-      </div>
-
-      <div id="game-over-screen" class="overlay-screen" style="display: none;">
-        <h1>FIM DE JOGO</h1>
-        <div class="stats-grid" style="grid-template-columns: 1fr; gap: 20px; margin-bottom: 20px;">
-          <p>Pontuação Final: <span id="final-score-value">0</span></p>
-          <p>Tempo Sobrevivido: <span id="final-time-value">00:00</span></p>
-          <p>Nível de Colapso: <span id="final-collapse-level">0</span></p>
-        </div>
-        <button id="restart-button" class="overlay-button">REINICIAR</button>
-        <button id="back-to-menu-button" class="overlay-button">VOLTAR AO MENU</button>
-        <div id="leaderboard-gameover" class="leaderboard-container">
-          <h2>🏆 Ranking - Top 10 🏆</h2>
-          <ol id="leaderboard-list-gameover">
-            <li>Atualizando ranking...</li>
-          </ol>
-        </div>
-      </div>
-
-      <div id="upgrade-panel" class="overlay-screen" style="display: none;">
-        <div class="panel-content">
-          <h2 id="upgrade-title">Evoluir Habilidade</h2>
-          <p id="upgrade-description">Descrição da evolução da habilidade aqui.</p>
-          <div>
-            <button id="upgrade-confirm-button" class="overlay-button">Confirmar</button>
-            <button id="upgrade-skip-button" class="overlay-button">Pular</button>
-          </div> 
-        </div>
-      </div>
-
-      <div id="event-message"></div>
-
-      <!-- HUD Elements -->
-      <div id="player-hud" style="display: none;">
-        <div class="hud-item">
-          <div class="hud-item-label">HP</div>
-          <div class="progress-bar-container">
-            <div id="hp-bar" class="progress-bar"></div>
-          </div>
-        </div>
-        <div id="shield-hud-item" class="hud-item" style="display: none;"> 
-          <div class="hud-item-label">Escudo</div>
-          <div class="progress-bar-container">
-            <div id="shield-bar" class="progress-bar"></div>
-          </div> 
-        </div>
-        <div class="hud-item"> 
-          <div class="hud-item-label">XP</div>
-          <div class="progress-bar-container"> 
-            <div id="xp-bar" class="progress-bar"></div>
-          </div>
-        </div>
-        <div class="stats-grid"> 
-          <div class="stat-box">
-            <h3>Nível</h3>
-            <p><span id="level-value">1</span></p> 
-          </div>
-          <div class="stat-box">
-            <h3>Passiva</h3> 
-            <p>Nv. <span id="passive-level-value">1</span></p>
-          </div>
-          <div class="stat-box">
-            <h3>Multiplicador</h3>
-            <p><span id="collapse-value">1</span>x</p>
-          </div>
-        </div> 
-        <div class="stats-grid"> 
-          <div class="stat-box" style="grid-column: 1 / -1;"> 
-            <h3>Pontuação</h3> 
-            <p id="score-value">0</p>
-          </div>
-        </div>
-        <div class="stats-grid"> 
-          <div class="stat-box" style="grid-column: 1 / -1;">
-            <h3>Tempo</h3>
-            <p id="time-value">00:00</p>
-          </div>
-        </div>
-      </div>
-
-      <!-- Boss HUD -->
-      <div id="boss-hud" class="boss-hud-container">
-        <div class="boss-hud-item"> 
-          <div id="boss-name-label" class="hud-item-label">Nome do Chefe</div>
-          <div class="progress-bar-container">
-            <div id="boss-hp-bar" class="progress-bar"></div>
-          </div>
-        </div>
-      </div>
-
-      <div id="poderoso-hud" class="boss-hud-container">
-        <div class="boss-hud-item">
-          <div class="hud-item-label" style="color: var(--poderoso-color);">O PODEROSO</div> 
-          <div class="progress-bar-container">
-            <div id="poderoso-hp-bar" class="progress-bar">
-              <div id="poderoso-hp-text" class="progress-bar-text"></div>
-            </div> 
-          </div>
-        </div>
-        <div class="boss-hud-item"> 
-          <div class="progress-bar-container">
-            <div id="poderoso-power-bar" class="progress-bar"> 
-              <div id="poderoso-power-text" class="progress-bar-text"></div>
-            </div> 
-          </div>
-        </div>
-      </div>
-
-      <div id="buff-display">
-        <h3 id="buff-name">Buff</h3>
-        <p id="buff-timer">0.0s</p>
-      </div>
-
-      <div id="skills-hud">
-        <div id="skill-q" class="skill-slot">Q</div>
-        <div id="skill-w" class="skill-slot">W</div>
-        <div id="skill-e" class="skill-slot">E</div>
-        <div id="skill-r" class="skill-slot">R</div>
-      </div>
-
-      <div id="mobile-controls">
-        <div id="joystick-container"> 
-          <div id="joystick-thumb"></div>
-        </div>
-        <div id="mobile-action-buttons">
-          <div id="attack-button" class="mobile-button">ATK</div>
-          <div id="q-button" class="mobile-button">Q</div>
-          <div id="w-button" class="mobile-button">W</div>
-          <div id="e-button" class="mobile-button">E</div>
-          <div id="r-button" class="mobile-button">R</div>
-        </div>
-      </div>
-    `
-
-    gameContainerRef.current.innerHTML = gameHTML
-
     // Adicionar estilos CSS
     addGameStyles()
 
     // Inicializar sistema de ranking
     initializeRankingSystem()
 
-    // Configurar event listeners
-    setupGameEventListeners()
+    // Pré-preencher nome do usuário
+    if (user?.email) {
+      setPlayerName(user.email.split('@')[0])
+    }
+
+    // Carregar ranking inicial
+    fetchAndDisplayLeaderboard('start')
   }
 
   const addGameStyles = () => {
+    // Remove existing style if it exists
+    if (styleRef.current && styleRef.current.parentNode) {
+      styleRef.current.parentNode.removeChild(styleRef.current)
+    }
+
     const style = document.createElement('style')
+    styleRef.current = style
     style.textContent = `
       :root {
         --poderoso-color: #ff00ff;
@@ -299,7 +177,7 @@ const SurvivalGame: React.FC = () => {
         cursor: not-allowed;
       }
 
-      #player-name-input {
+      .player-name-input {
         padding: 15px;
         font-size: 1.2rem;
         font-family: 'Orbitron', sans-serif;
@@ -312,7 +190,7 @@ const SurvivalGame: React.FC = () => {
         width: 300px;
       }
 
-      #player-name-input:focus {
+      .player-name-input:focus {
         outline: none;
         border-color: #0ff;
       }
@@ -357,7 +235,7 @@ const SurvivalGame: React.FC = () => {
         box-shadow: 0 0 20px rgba(0,0,0,0.5);
       }
 
-      #player-hud {
+      .player-hud {
         position: absolute;
         top: 20px;
         left: 20px;
@@ -406,19 +284,19 @@ const SurvivalGame: React.FC = () => {
         text-shadow: 1px 1px 2px #000;
       }
 
-      #hp-bar { 
+      .hp-bar { 
         background: linear-gradient(90deg, #d32f2f, #f44336); 
       }
 
-      #hp-bar.low { 
+      .hp-bar.low { 
         animation: pulse-red 1s infinite; 
       }
 
-      #xp-bar { 
+      .xp-bar { 
         background: linear-gradient(90deg, #673ab7, #9575cd); 
       }
 
-      #shield-bar { 
+      .shield-bar { 
         background: linear-gradient(90deg, #fbc02d, #fdd835); 
       }
 
@@ -447,7 +325,7 @@ const SurvivalGame: React.FC = () => {
         margin: 0; 
       }
 
-      #buff-display {
+      .buff-display {
         position: absolute;
         top: 20px;
         right: 20px;
@@ -482,19 +360,19 @@ const SurvivalGame: React.FC = () => {
         text-align: center;
       }
 
-      #boss-hp-bar { 
+      .boss-hp-bar { 
         background: linear-gradient(90deg, #c62828, #e53935); 
       }
 
-      #poderoso-hp-bar { 
+      .poderoso-hp-bar { 
         background: linear-gradient(90deg, #6a1b9a, var(--poderoso-color)); 
       }
 
-      #poderoso-power-bar { 
+      .poderoso-power-bar { 
         background: linear-gradient(90deg, #f9a825, #fdd835); 
       }
 
-      #skills-hud {
+      .skills-hud {
         position: absolute;
         bottom: 20px;
         left: 50%;
@@ -536,7 +414,7 @@ const SurvivalGame: React.FC = () => {
         border-radius: 6px;
       }
 
-      #mobile-controls {
+      .mobile-controls {
         display: none;
         position: absolute;
         bottom: 0;
@@ -547,7 +425,7 @@ const SurvivalGame: React.FC = () => {
         z-index: 20;
       }
 
-      #joystick-container {
+      .joystick-container {
         position: absolute;
         bottom: 40px;
         left: 40px;
@@ -558,7 +436,7 @@ const SurvivalGame: React.FC = () => {
         pointer-events: auto;
       }
 
-      #joystick-thumb {
+      .joystick-thumb {
         position: absolute;
         top: 50%;
         left: 50%;
@@ -570,7 +448,7 @@ const SurvivalGame: React.FC = () => {
         pointer-events: none;
       }
 
-      #mobile-action-buttons {
+      .mobile-action-buttons {
         position: absolute;
         bottom: 40px;
         right: 40px;
@@ -593,19 +471,19 @@ const SurvivalGame: React.FC = () => {
         align-items: center;
       }
 
-      #attack-button { 
+      .attack-button { 
         grid-area: attack; 
         width: 90px; 
         height: 90px; 
         background-color: rgba(200, 50, 50, 0.7); 
       }
 
-      #q-button { grid-area: q; }
-      #w-button { grid-area: w; }
-      #e-button { grid-area: e; }
-      #r-button { grid-area: r; }
+      .q-button { grid-area: q; }
+      .w-button { grid-area: w; }
+      .e-button { grid-area: e; }
+      .r-button { grid-area: r; }
 
-      #event-message {
+      .event-message {
         position: absolute;
         top: 20%;
         left: 50%;
@@ -622,7 +500,7 @@ const SurvivalGame: React.FC = () => {
         pointer-events: none;
       }
 
-      #event-message.show {
+      .event-message.show {
         opacity: 1;
       }
     `
@@ -645,23 +523,22 @@ const SurvivalGame: React.FC = () => {
           if (error) throw error
           
           // Atualizar ranking após postar score
-          await fetchAndDisplayLeaderboard('leaderboard-list-gameover')
+          await fetchAndDisplayLeaderboard('gameover')
         } catch (error) {
           console.error('Erro ao postar score:', error)
         }
-      },
-      fetchAndDisplayLeaderboard: fetchAndDisplayLeaderboard
+      }
     }
-
-    // Carregar ranking inicial
-    fetchAndDisplayLeaderboard('leaderboard-list-start')
   }
 
-  const fetchAndDisplayLeaderboard = async (listElementId: string) => {
-    const listElement = document.getElementById(listElementId)
-    if (!listElement) return
-
-    listElement.innerHTML = '<li>Carregando ranking...</li>'
+  const fetchAndDisplayLeaderboard = async (type: 'start' | 'gameover') => {
+    const loadingText = type === 'start' ? 'Carregando ranking...' : 'Atualizando ranking...'
+    
+    if (type === 'start') {
+      setLeaderboardStart(loadingText)
+    } else {
+      setLeaderboardGameOver(loadingText)
+    }
 
     try {
       const { supabase } = await import('../lib/supabase')
@@ -677,10 +554,13 @@ const SurvivalGame: React.FC = () => {
 
       if (error) throw error
 
-      listElement.innerHTML = ''
-
       if (!data || data.length === 0) {
-        listElement.innerHTML = '<li>Ninguém no ranking ainda. Seja o primeiro!</li>'
+        const emptyText = 'Ninguém no ranking ainda. Seja o primeiro!'
+        if (type === 'start') {
+          setLeaderboardStart(emptyText)
+        } else {
+          setLeaderboardGameOver(emptyText)
+        }
         return
       }
 
@@ -697,8 +577,7 @@ const SurvivalGame: React.FC = () => {
         .sort((a, b) => b.score - a.score)
         .slice(0, 10)
 
-      top10.forEach((scoreData, index) => {
-        const li = document.createElement('li')
+      const leaderboardHTML = top10.map((scoreData, index) => {
         let medal = ''
         if (index === 0) medal = '🥇 '
         else if (index === 1) medal = '🥈 '
@@ -706,109 +585,58 @@ const SurvivalGame: React.FC = () => {
         else medal = `${index + 1}. `
 
         const playerName = scoreData.user_id === user?.id ? 'Você' : `Jogador ${scoreData.user_id.slice(0, 8)}...`
-        li.textContent = `${medal}${playerName} — ${scoreData.score} pontos`
+        const isCurrentUser = scoreData.user_id === user?.id
         
-        if (scoreData.user_id === user?.id) {
-          li.style.color = '#00bfff'
-          li.style.fontWeight = 'bold'
-        }
-        
-        listElement.appendChild(li)
-      })
+        return `<li style="${isCurrentUser ? 'color: #00bfff; font-weight: bold;' : ''}">${medal}${playerName} — ${scoreData.score} pontos</li>`
+      }).join('')
+
+      if (type === 'start') {
+        setLeaderboardStart(leaderboardHTML)
+      } else {
+        setLeaderboardGameOver(leaderboardHTML)
+      }
     } catch (error) {
       console.error('Erro ao buscar ranking:', error)
-      listElement.innerHTML = '<li>Não foi possível carregar o ranking.</li>'
+      const errorText = 'Não foi possível carregar o ranking.'
+      if (type === 'start') {
+        setLeaderboardStart(errorText)
+      } else {
+        setLeaderboardGameOver(errorText)
+      }
     }
   }
 
-  const setupGameEventListeners = () => {
-    const nameInput = document.getElementById('player-name-input') as HTMLInputElement
-    const pcButton = document.getElementById('pc-button')
-    const mobileButton = document.getElementById('mobile-button')
-    const restartButton = document.getElementById('restart-button')
-    const backToMenuButton = document.getElementById('back-to-menu-button')
-
-    // Pré-preencher com nome do usuário
-    if (nameInput && user?.email) {
-      nameInput.value = user.email.split('@')[0]
-      setPlayerName(nameInput.value)
-    }
-
-    // Event listeners
-    if (nameInput) {
-      nameInput.addEventListener('input', (e) => {
-        const target = e.target as HTMLInputElement
-        setPlayerName(target.value)
-      })
-    }
-
-    if (pcButton) {
-      pcButton.addEventListener('click', () => startGame('pc'))
-    }
-
-    if (mobileButton) {
-      mobileButton.addEventListener('click', () => startGame('mobile'))
-    }
-
-    if (restartButton) {
-      restartButton.addEventListener('click', () => {
-        window.location.reload()
-      })
-    }
-
-    if (backToMenuButton) {
-      backToMenuButton.addEventListener('click', () => {
-        navigate('/ranking')
-      })
-    }
-  }
-
-  const startGame = (platform: 'pc' | 'mobile') => {
+  const startGame = (selectedPlatform: 'pc' | 'mobile') => {
     if (!playerName.trim()) {
       alert('Por favor, digite seu nome para continuar.')
       return
     }
 
+    setPlatform(selectedPlatform)
     setGameStarted(true)
     
-    // Ocultar tela inicial
-    const startScreen = document.getElementById('start-screen')
-    if (startScreen) {
-      startScreen.style.display = 'none'
-    }
-
     // Inicializar o jogo 3D
-    initializeThreeJSGame(platform)
+    initializeThreeJSGame(selectedPlatform)
   }
 
-  const initializeThreeJSGame = (platform: 'pc' | 'mobile') => {
-    // Aqui seria onde todo o código do jogo 3D seria executado
-    // Por questões de espaço, vou criar uma versão simplificada
-    
+  const initializeThreeJSGame = (selectedPlatform: 'pc' | 'mobile') => {
+    // Remove existing script if it exists
+    if (scriptRef.current && scriptRef.current.parentNode) {
+      scriptRef.current.parentNode.removeChild(scriptRef.current)
+    }
+
     const gameScript = document.createElement('script')
+    scriptRef.current = gameScript
     gameScript.type = 'module'
     gameScript.textContent = `
       // Código do jogo 3D seria inserido aqui
       // Por questões de espaço, esta é uma versão simplificada
       
-      console.log('Jogo 3D iniciado para plataforma:', '${platform}')
+      console.log('Jogo 3D iniciado para plataforma:', '${selectedPlatform}')
       console.log('Nome do jogador:', '${playerName}')
-      
-      // Simular início do jogo
-      document.getElementById('player-hud').style.display = 'block'
-      document.getElementById('skills-hud').style.display = 'flex'
-      
-      if ('${platform}' === 'mobile') {
-        document.getElementById('mobile-controls').style.display = 'block'
-      }
       
       // Simular fim de jogo após 10 segundos para demonstração
       setTimeout(() => {
-        document.getElementById('final-score-value').textContent = '1000'
-        document.getElementById('final-time-value').textContent = '00:10'
-        document.getElementById('final-collapse-level').textContent = '1'
-        document.getElementById('game-over-screen').style.display = 'flex'
-        
         // Postar score
         if (window.rankingManager) {
           window.rankingManager.postScore('${playerName}', 1000)
@@ -819,12 +647,181 @@ const SurvivalGame: React.FC = () => {
     document.head.appendChild(gameScript)
   }
 
+  const handleRestart = () => {
+    window.location.reload()
+  }
+
+  const handleBackToMenu = () => {
+    navigate('/ranking')
+  }
+
   if (!user) {
     return null
   }
 
   return (
     <div className="survival-game-container" ref={gameContainerRef}>
+      <div className="blind-screen-effect"></div>
+
+      {!gameStarted && (
+        <div className="overlay-screen">
+          <h1>SOBREVIVÊNCIA 3D</h1>
+          <p>Digite seu nome para entrar no ranking!</p>
+          <input 
+            type="text" 
+            className="player-name-input"
+            placeholder="Seu nome aqui..." 
+            maxLength={15} 
+            value={playerName}
+            onChange={(e) => setPlayerName(e.target.value)}
+          />
+          <p>Escolha sua plataforma para começar</p>
+          <div> 
+            <button className="overlay-button" onClick={() => startGame('pc')}>PC</button>
+            <button className="overlay-button" onClick={() => startGame('mobile')}>Mobile</button>
+          </div>
+          <div className="leaderboard-container">
+            <h2>🏆 Ranking - Top 10 🏆</h2>
+            <ol dangerouslySetInnerHTML={{ __html: leaderboardStart }}></ol>
+          </div>
+        </div>
+      )}
+
+      {gameStarted && (
+        <>
+          <div className="overlay-screen" style={{ display: 'none' }} id="game-over-screen">
+            <h1>FIM DE JOGO</h1>
+            <div className="stats-grid" style={{ gridTemplateColumns: '1fr', gap: '20px', marginBottom: '20px' }}>
+              <p>Pontuação Final: <span id="final-score-value">1000</span></p>
+              <p>Tempo Sobrevivido: <span id="final-time-value">00:10</span></p>
+              <p>Nível de Colapso: <span id="final-collapse-level">1</span></p>
+            </div>
+            <button className="overlay-button" onClick={handleRestart}>REINICIAR</button>
+            <button className="overlay-button" onClick={handleBackToMenu}>VOLTAR AO MENU</button>
+            <div className="leaderboard-container">
+              <h2>🏆 Ranking - Top 10 🏆</h2>
+              <ol dangerouslySetInnerHTML={{ __html: leaderboardGameOver }}></ol>
+            </div>
+          </div>
+
+          <div className="overlay-screen" style={{ display: 'none' }} id="upgrade-panel">
+            <div className="panel-content">
+              <h2 id="upgrade-title">Evoluir Habilidade</h2>
+              <p id="upgrade-description">Descrição da evolução da habilidade aqui.</p>
+              <div>
+                <button className="overlay-button" id="upgrade-confirm-button">Confirmar</button>
+                <button className="overlay-button" id="upgrade-skip-button">Pular</button>
+              </div> 
+            </div>
+          </div>
+
+          <div className="event-message" id="event-message"></div>
+
+          {/* HUD Elements */}
+          <div className="player-hud" style={{ display: gameStarted ? 'block' : 'none' }}>
+            <div className="hud-item">
+              <div className="hud-item-label">HP</div>
+              <div className="progress-bar-container">
+                <div className="progress-bar hp-bar" style={{ width: '100%' }}></div>
+              </div>
+            </div>
+            <div className="hud-item" style={{ display: 'none' }}> 
+              <div className="hud-item-label">Escudo</div>
+              <div className="progress-bar-container">
+                <div className="progress-bar shield-bar" style={{ width: '100%' }}></div>
+              </div> 
+            </div>
+            <div className="hud-item"> 
+              <div className="hud-item-label">XP</div>
+              <div className="progress-bar-container"> 
+                <div className="progress-bar xp-bar" style={{ width: '0%' }}></div>
+              </div>
+            </div>
+            <div className="stats-grid"> 
+              <div className="stat-box">
+                <h3>Nível</h3>
+                <p><span>1</span></p> 
+              </div>
+              <div className="stat-box">
+                <h3>Passiva</h3> 
+                <p>Nv. <span>1</span></p>
+              </div>
+              <div className="stat-box">
+                <h3>Multiplicador</h3>
+                <p><span>1</span>x</p>
+              </div>
+            </div> 
+            <div className="stats-grid"> 
+              <div className="stat-box" style={{ gridColumn: '1 / -1' }}> 
+                <h3>Pontuação</h3> 
+                <p>0</p>
+              </div>
+            </div>
+            <div className="stats-grid"> 
+              <div className="stat-box" style={{ gridColumn: '1 / -1' }}>
+                <h3>Tempo</h3>
+                <p>00:00</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Boss HUD */}
+          <div className="boss-hud-container">
+            <div className="boss-hud-item"> 
+              <div className="hud-item-label">Nome do Chefe</div>
+              <div className="progress-bar-container">
+                <div className="progress-bar boss-hp-bar" style={{ width: '100%' }}></div>
+              </div>
+            </div>
+          </div>
+
+          <div className="boss-hud-container">
+            <div className="boss-hud-item">
+              <div className="hud-item-label" style={{ color: 'var(--poderoso-color)' }}>O PODEROSO</div> 
+              <div className="progress-bar-container">
+                <div className="progress-bar poderoso-hp-bar" style={{ width: '100%' }}>
+                  <div className="progress-bar-text"></div>
+                </div> 
+              </div>
+            </div>
+            <div className="boss-hud-item"> 
+              <div className="progress-bar-container">
+                <div className="progress-bar poderoso-power-bar" style={{ width: '100%' }}> 
+                  <div className="progress-bar-text"></div>
+                </div> 
+              </div>
+            </div>
+          </div>
+
+          <div className="buff-display">
+            <h3>Buff</h3>
+            <p>0.0s</p>
+          </div>
+
+          <div className="skills-hud" style={{ display: gameStarted ? 'flex' : 'none' }}>
+            <div className="skill-slot">Q</div>
+            <div className="skill-slot">W</div>
+            <div className="skill-slot">E</div>
+            <div className="skill-slot">R</div>
+          </div>
+
+          {platform === 'mobile' && (
+            <div className="mobile-controls" style={{ display: 'block' }}>
+              <div className="joystick-container"> 
+                <div className="joystick-thumb"></div>
+              </div>
+              <div className="mobile-action-buttons">
+                <div className="mobile-button attack-button">ATK</div>
+                <div className="mobile-button q-button">Q</div>
+                <div className="mobile-button w-button">W</div>
+                <div className="mobile-button e-button">E</div>
+                <div className="mobile-button r-button">R</div>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
       {!isGameLoaded && (
         <div className="overlay-screen">
           <h1>Carregando Jogo...</h1>
