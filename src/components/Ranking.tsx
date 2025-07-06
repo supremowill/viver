@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
+import { useNavigate } from 'react-router-dom'
 
 interface Score {
   id: number
@@ -19,6 +20,7 @@ interface RankingEntry {
 
 const Ranking: React.FC = () => {
   const { user, signOut } = useAuth()
+  const navigate = useNavigate()
   const [ranking, setRanking] = useState<RankingEntry[]>([])
   const [userStats, setUserStats] = useState<RankingEntry | null>(null)
   const [loading, setLoading] = useState(true)
@@ -226,13 +228,20 @@ const Ranking: React.FC = () => {
           )}
         </div>
 
-        {/* Game Button */}
-        <div className="mt-8 text-center">
+        {/* Game Buttons */}
+        <div className="mt-8 text-center space-x-4">
           <button
-            onClick={() => window.location.href = '/game'}
+            onClick={() => navigate('/game')}
             className="bg-gradient-to-r from-green-600 to-blue-600 text-white font-semibold py-4 px-8 rounded-lg hover:from-green-700 hover:to-blue-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 focus:ring-offset-transparent transition-all duration-200 text-lg"
           >
-            🎮 Jogar Agora
+            🎮 Jogo Simples
+          </button>
+          
+          <button
+            onClick={() => navigate('/survival')}
+            className="bg-gradient-to-r from-purple-600 to-pink-600 text-white font-semibold py-4 px-8 rounded-lg hover:from-purple-700 hover:to-pink-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 focus:ring-offset-transparent transition-all duration-200 text-lg"
+          >
+            ⚔️ Sobrevivência 3D
           </button>
         </div>
       </div>

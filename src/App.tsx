@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import Ranking from './components/Ranking'
 import Game from './components/Game'
+import SurvivalGame from './components/SurvivalGame'
 import Auth from './components/Auth'
 
 const AppContent: React.FC = () => {
@@ -26,6 +27,7 @@ const AppContent: React.FC = () => {
         <Route path="/" element={<Navigate to="/ranking" replace />} />
         <Route path="/ranking" element={<Ranking />} />
         <Route path="/game" element={<Game />} />
+        <Route path="/survival" element={<SurvivalGame />} />
       </Routes>
     </Router>
   )
