@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 
@@ -23,14 +23,7 @@ const Ranking: React.FC = () => {
   const [userStats, setUserStats] = useState<RankingEntry | null>(null)
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    fetchRanking()
-    if (user) {
-      fetchUserStats()
-    }
-  }, [user])
-
-  const fetchRanking = async () => {
+  const fetchRanking = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('scores')
@@ -51,7 +44,7 @@ const Ranking: React.FC = () => {
         if (!userStats[userId]) {
           userStats[userId] = {
             user_id: userId,
-            email: userId, // We'll get the actual email from auth
+            email: userId === user?.id ? (user.email || 'Você') : `Jogador ${userId.slice(0, 8)}...`,
             best_score: score.score,
             total_games: 1,
             last_played: score.created_at
@@ -65,28 +58,16 @@ const Ranking: React.FC = () => {
         }
       }
 
-      // Get user emails
-      const userIds = Object.keys(userStats)
-      const { data: authUsers } = await supabase.auth.admin.listUsers()
-      
-      // Map emails to user stats
-      const rankingWithEmails = Object.values(userStats).map(stat => {
-        const authUser = authUsers?.users.find(u => u.id === stat.user_id)
-        return {
-          ...stat,
-          email: authUser?.email || 'Usuário desconhecido'
-        }
-      })
-
-      setRanking(rankingWithEmails.sort((a, b) => b.best_score - a.best_score))
+      const rankingEntries = Object.values(userStats).sort((a, b) => b.best_score - a.best_score)
+      setRanking(rankingEntries)
     } catch (error) {
       console.error('Erro ao buscar ranking:', error)
     } finally {
       setLoading(false)
     }
-  }
+  }, [user])
 
-  const fetchUserStats = async () => {
+  const fetchUserStats = useCallback(async () => {
     if (!user) return
 
     try {
@@ -115,7 +96,14 @@ const Ranking: React.FC = () => {
     } catch (error) {
       console.error('Erro ao buscar estatísticas do usuário:', error)
     }
-  }
+  }, [user])
+
+  useEffect(() => {
+    fetchRanking()
+    if (user) {
+      fetchUserStats()
+    }
+  }, [fetchRanking, fetchUserStats, user])
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('pt-BR', {

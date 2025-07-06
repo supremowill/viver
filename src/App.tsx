@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import Ranking from './components/Ranking'
 import Game from './components/Game'
+import Auth from './components/Auth'
 
 const AppContent: React.FC = () => {
   const { user, loading } = useAuth()
@@ -15,9 +16,8 @@ const AppContent: React.FC = () => {
     )
   }
 
-  // If no user, return null and let index.html handle the login screen
   if (!user) {
-    return null
+    return <Auth />
   }
 
   return (
