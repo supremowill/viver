@@ -1,9 +1,17 @@
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+// Use the global supabaseClient from index.html to avoid conflicts
+declare global {
+  interface Window {
+    supabaseClient: any
+  }
+}
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+// Use the shared client from index.html if available, otherwise create a new one
+export const supabase = window.supabaseClient || createClient(
+  import.meta.env.VITE_SUPABASE_URL,
+  import.meta.env.VITE_SUPABASE_ANON_KEY
+)
 
 export type Database = {
   public: {

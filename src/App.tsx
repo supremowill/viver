@@ -1,7 +1,6 @@
 import React from 'react'
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
-import Auth from './components/Auth'
 import Ranking from './components/Ranking'
 import Game from './components/Game'
 
@@ -16,8 +15,9 @@ const AppContent: React.FC = () => {
     )
   }
 
+  // If no user, return null and let index.html handle the login screen
   if (!user) {
-    return <Auth />
+    return null
   }
 
   return (
