@@ -11,9 +11,13 @@ const SurvivalGame: React.FC = () => {
   const [isGameLoaded, setIsGameLoaded] = useState(false)
   const [playerName, setPlayerName] = useState('')
   const [gameStarted, setGameStarted] = useState(false)
+  const [gameOver, setGameOver] = useState(false)
   const [platform, setPlatform] = useState<'pc' | 'mobile' | null>(null)
   const [leaderboardStart, setLeaderboardStart] = useState<string>('Carregando ranking...')
   const [leaderboardGameOver, setLeaderboardGameOver] = useState<string>('Atualizando ranking...')
+  const [finalScore, setFinalScore] = useState(1000)
+  const [finalTime, setFinalTime] = useState('00:10')
+  const [finalCollapseLevel, setFinalCollapseLevel] = useState(1)
 
   useEffect(() => {
     if (!user) {
@@ -637,14 +641,40 @@ const SurvivalGame: React.FC = () => {
       
       // Simular fim de jogo após 10 segundos para demonstração
       setTimeout(() => {
+        // Simular dados de fim de jogo
+        const finalScore = Math.floor(Math.random() * 5000) + 1000;
+        const finalTime = '00:' + (10 + Math.floor(Math.random() * 50)).toString().padStart(2, '0');
+        const finalCollapseLevel = Math.floor(Math.random() * 3) + 1;
+        
+        // Atualizar estado do React
+        window.dispatchEvent(new CustomEvent('gameOver', {
+          detail: { score: finalScore, time: finalTime, collapseLevel: finalCollapseLevel }
+        }));
+        
         // Postar score
         if (window.rankingManager) {
-          window.rankingManager.postScore('${playerName}', 1000)
+          window.rankingManager.postScore('${playerName}', finalScore);
         }
       }, 10000)
     `
     
     document.head.appendChild(gameScript)
+
+    // Adicionar listener para evento de fim de jogo
+    const handleGameOver = (event: any) => {
+      const { score, time, collapseLevel } = event.detail
+      setFinalScore(score)
+      setFinalTime(time)
+      setFinalCollapseLevel(collapseLevel)
+      setGameOver(true)
+    }
+
+    window.addEventListener('gameOver', handleGameOver)
+
+    // Cleanup listener
+    return () => {
+      window.removeEventListener('gameOver', handleGameOver)
+    }
   }
 
   const handleRestart = () => {
@@ -663,7 +693,14 @@ const SurvivalGame: React.FC = () => {
     <div className="survival-game-container" ref={gameContainerRef}>
       <div className="blind-screen-effect"></div>
 
-      {!gameStarted && (
+      {!isGameLoaded && (
+        <div className="overlay-screen">
+          <h1>Carregando Jogo...</h1>
+          <p>Preparando a experiência de sobrevivência 3D...</p>
+        </div>
+      )}
+
+      {isGameLoaded && !gameStarted && (
         <div className="overlay-screen">
           <h1>SOBREVIVÊNCIA 3D</h1>
           <p>Digite seu nome para entrar no ranking!</p>
@@ -687,54 +724,51 @@ const SurvivalGame: React.FC = () => {
         </div>
       )}
 
-      {gameStarted && (
+      {gameStarted && gameOver && (
+        <div className="overlay-screen">
+          <h1>FIM DE JOGO</h1>
+          <div className="stats-grid" style={{ gridTemplateColumns: '1fr', gap: '20px', marginBottom: '20px' }}>
+            <p>Pontuação Final: <span>{finalScore}</span></p>
+            <p>Tempo Sobrevivido: <span>{finalTime}</span></p>
+            <p>Nível de Colapso: <span>{finalCollapseLevel}</span></p>
+          </div>
+          <button className="overlay-button" onClick={handleRestart}>REINICIAR</button>
+          <button className="overlay-button" onClick={handleBackToMenu}>VOLTAR AO MENU</button>
+          <div className="leaderboard-container">
+            <h2>🏆 Ranking - Top 10 🏆</h2>
+            <ol dangerouslySetInnerHTML={{ __html: leaderboardGameOver }}></ol>
+          </div>
+        </div>
+      )}
+
+      {gameStarted && !gameOver && (
         <>
-          <div className="overlay-screen" style={{ display: 'none' }} id="game-over-screen">
-            <h1>FIM DE JOGO</h1>
-            <div className="stats-grid" style={{ gridTemplateColumns: '1fr', gap: '20px', marginBottom: '20px' }}>
-              <p>Pontuação Final: <span id="final-score-value">1000</span></p>
-              <p>Tempo Sobrevivido: <span id="final-time-value">00:10</span></p>
-              <p>Nível de Colapso: <span id="final-collapse-level">1</span></p>
-            </div>
-            <button className="overlay-button" onClick={handleRestart}>REINICIAR</button>
-            <button className="overlay-button" onClick={handleBackToMenu}>VOLTAR AO MENU</button>
-            <div className="leaderboard-container">
-              <h2>🏆 Ranking - Top 10 🏆</h2>
-              <ol dangerouslySetInnerHTML={{ __html: leaderboardGameOver }}></ol>
-            </div>
-          </div>
-
-          <div className="overlay-screen" style={{ display: 'none' }} id="upgrade-panel">
-            <div className="panel-content">
-              <h2 id="upgrade-title">Evoluir Habilidade</h2>
-              <p id="upgrade-description">Descrição da evolução da habilidade aqui.</p>
-              <div>
-                <button className="overlay-button" id="upgrade-confirm-button">Confirmar</button>
-                <button className="overlay-button" id="upgrade-skip-button">Pular</button>
-              </div> 
-            </div>
-          </div>
-
           <div className="event-message" id="event-message"></div>
 
           {/* HUD Elements */}
-          <div className="player-hud" style={{ display: gameStarted ? 'block' : 'none' }}>
+          <div className="player-hud">
             <div className="hud-item">
               <div className="hud-item-label">HP</div>
               <div className="progress-bar-container">
-                <div className="progress-bar hp-bar" style={{ width: '100%' }}></div>
+                <div className="progress-bar hp-bar" style={{ width: '100%' }}>
+                  <div className="progress-bar-text">100 / 100</div>
+                </div>
               </div>
             </div>
             <div className="hud-item" style={{ display: 'none' }}> 
               <div className="hud-item-label">Escudo</div>
               <div className="progress-bar-container">
-                <div className="progress-bar shield-bar" style={{ width: '100%' }}></div>
+                <div className="progress-bar shield-bar" style={{ width: '100%' }}>
+                  <div className="progress-bar-text">100 / 100</div>
+                </div>
               </div> 
             </div>
             <div className="hud-item"> 
               <div className="hud-item-label">XP</div>
               <div className="progress-bar-container"> 
-                <div className="progress-bar xp-bar" style={{ width: '0%' }}></div>
+                <div className="progress-bar xp-bar" style={{ width: '0%' }}>
+                  <div className="progress-bar-text">0 / 10</div>
+                </div>
               </div>
             </div>
             <div className="stats-grid"> 
@@ -765,40 +799,7 @@ const SurvivalGame: React.FC = () => {
             </div>
           </div>
 
-          {/* Boss HUD */}
-          <div className="boss-hud-container">
-            <div className="boss-hud-item"> 
-              <div className="hud-item-label">Nome do Chefe</div>
-              <div className="progress-bar-container">
-                <div className="progress-bar boss-hp-bar" style={{ width: '100%' }}></div>
-              </div>
-            </div>
-          </div>
-
-          <div className="boss-hud-container">
-            <div className="boss-hud-item">
-              <div className="hud-item-label" style={{ color: 'var(--poderoso-color)' }}>O PODEROSO</div> 
-              <div className="progress-bar-container">
-                <div className="progress-bar poderoso-hp-bar" style={{ width: '100%' }}>
-                  <div className="progress-bar-text"></div>
-                </div> 
-              </div>
-            </div>
-            <div className="boss-hud-item"> 
-              <div className="progress-bar-container">
-                <div className="progress-bar poderoso-power-bar" style={{ width: '100%' }}> 
-                  <div className="progress-bar-text"></div>
-                </div> 
-              </div>
-            </div>
-          </div>
-
-          <div className="buff-display">
-            <h3>Buff</h3>
-            <p>0.0s</p>
-          </div>
-
-          <div className="skills-hud" style={{ display: gameStarted ? 'flex' : 'none' }}>
+          <div className="skills-hud" style={{ display: 'flex' }}>
             <div className="skill-slot">Q</div>
             <div className="skill-slot">W</div>
             <div className="skill-slot">E</div>
@@ -820,13 +821,6 @@ const SurvivalGame: React.FC = () => {
             </div>
           )}
         </>
-      )}
-
-      {!isGameLoaded && (
-        <div className="overlay-screen">
-          <h1>Carregando Jogo...</h1>
-          <p>Preparando a experiência de sobrevivência 3D...</p>
-        </div>
       )}
     </div>
   )
