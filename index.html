@@ -1,21 +1,159 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="pt-BR">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Game Ranking</title>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calculadora de Ganhos - Motorista</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-      body {
-        margin: 0;
-        padding: 0;
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
-      }
-    </style>
-  </head>
-  <body>
-    <div id="react-root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        uber: {
+                            black: '#000000',
+                            gray: '#F6F6F6',
+                            green: '#276EF1',
+                            dark: '#1f1f1f'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-gray-100 min-h-screen flex items-center justify-center font-sans">
+
+    <div class="w-full max-w-md bg-white rounded-2xl shadow-xl overflow-hidden m-4">
+        <!-- Header -->
+        <div class="bg-black p-6 text-white text-center relative">
+            <h1 class="text-xl font-bold"><i class="fas fa-car-side mr-2"></i>Calculadora de Tarifas</h1>
+            <p class="text-xs text-gray-400 mt-1">Baseado na regra: 1 Km = 2 Min</p>
+            <div class="absolute top-0 right-0 p-2 opacity-10">
+                <i class="fas fa-taxi fa-4x"></i>
+            </div>
+        </div>
+
+        <!-- Inputs -->
+        <div class="p-6 space-y-5">
+            
+            <!-- Valor -->
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Valor da Corrida (R$)</label>
+                <div class="relative rounded-md shadow-sm">
+                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <span class="text-gray-500 sm:text-sm">R$</span>
+                    </div>
+                    <input type="number" id="price" step="0.01" class="focus:ring-black focus:border-black block w-full pl-10 pr-12 sm:text-lg border-gray-300 rounded-md py-3 bg-gray-50" placeholder="0,00" oninput="calculate()">
+                </div>
+            </div>
+
+            <!-- Distância -->
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Distância (Km)</label>
+                <div class="relative rounded-md shadow-sm">
+                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <i class="fas fa-road text-gray-400"></i>
+                    </div>
+                    <input type="number" id="km" step="0.1" class="focus:ring-black focus:border-black block w-full pl-10 sm:text-lg border-gray-300 rounded-md py-3 bg-gray-50" placeholder="0.0" oninput="calculate()">
+                    <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                        <span class="text-gray-500 sm:text-sm">km</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tempo -->
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Minutos</label>
+                    <input type="number" id="minutes" class="focus:ring-black focus:border-black block w-full sm:text-lg border-gray-300 rounded-md py-3 bg-gray-50 text-center" placeholder="0" oninput="calculate()">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Segundos</label>
+                    <input type="number" id="seconds" class="focus:ring-black focus:border-black block w-full sm:text-lg border-gray-300 rounded-md py-3 bg-gray-50 text-center" placeholder="0" max="59" oninput="calculate()">
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Resultados -->
+        <div id="result-area" class="bg-gray-50 p-6 border-t border-gray-200 transition-all duration-300 opacity-50">
+            <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wide mb-4 text-center">Resultados Calculados</h3>
+            
+            <div class="grid grid-cols-2 gap-4">
+                <!-- Card KM -->
+                <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex flex-col items-center justify-center text-center">
+                    <div class="text-gray-400 text-xs mb-1">Ganho por Km</div>
+                    <div class="text-2xl font-bold text-green-600" id="result-km">R$ 0,00</div>
+                    <div class="text-xs text-gray-400 mt-1">Base da Tarifa</div>
+                </div>
+
+                <!-- Card Minuto -->
+                <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex flex-col items-center justify-center text-center">
+                    <div class="text-gray-400 text-xs mb-1">Ganho por Min</div>
+                    <div class="text-2xl font-bold text-blue-600" id="result-min">R$ 0,00</div>
+                    <div class="text-xs text-gray-400 mt-1">Tempo Parado/Rodando</div>
+                </div>
+            </div>
+
+            <!-- Resumo Total -->
+            <div class="mt-4 bg-black text-white p-4 rounded-xl text-center">
+                <div class="text-xs text-gray-400 mb-1">Seu ganho combinado (1km + 2min)</div>
+                <div class="text-xl font-bold" id="result-combined">R$ 0,00</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function formatMoney(value) {
+            return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        }
+
+        function calculate() {
+            // Inputs
+            const price = parseFloat(document.getElementById('price').value) || 0;
+            const km = parseFloat(document.getElementById('km').value) || 0;
+            const minutes = parseFloat(document.getElementById('minutes').value) || 0;
+            const seconds = parseFloat(document.getElementById('seconds').value) || 0;
+
+            const resultArea = document.getElementById('result-area');
+
+            // Validação básica para começar a mostrar resultados
+            if (price > 0 && (km > 0 || (minutes > 0 || seconds > 0))) {
+                resultArea.classList.remove('opacity-50');
+                
+                // Converte tempo total para minutos decimais (ex: 7m 30s = 7.5 min)
+                const totalTimeInMinutes = minutes + (seconds / 60);
+
+                // Lógica Matemática:
+                // Preço Total = (Km * ValorKm) + (Tempo * ValorMin)
+                // Regra do Usuário: ValorKm = 2 * ValorMin
+                // Substituindo: Preço Total = (Km * 2 * ValorMin) + (Tempo * ValorMin)
+                // Preço Total = ValorMin * (2 * Km + Tempo)
+                // ValorMin = Preço Total / (2 * Km + Tempo)
+
+                const denominator = (2 * km) + totalTimeInMinutes;
+
+                if (denominator === 0) return; // Evita divisão por zero
+
+                const valuePerMinute = price / denominator;
+                const valuePerKm = valuePerMinute * 2;
+                const combinedValue = valuePerKm + (valuePerMinute * 2); // Apenas ilustrativo (quanto ganha fazendo 1km em 2 min)
+
+                // Atualiza tela
+                document.getElementById('result-km').innerText = formatMoney(valuePerKm);
+                document.getElementById('result-min').innerText = formatMoney(valuePerMinute);
+                document.getElementById('result-combined').innerText = formatMoney(combinedValue);
+
+            } else {
+                resultArea.classList.add('opacity-50');
+                document.getElementById('result-km').innerText = "R$ 0,00";
+                document.getElementById('result-min').innerText = "R$ 0,00";
+                document.getElementById('result-combined').innerText = "R$ 0,00";
+            }
+        }
+    </script>
+</body>
 </html>
+
